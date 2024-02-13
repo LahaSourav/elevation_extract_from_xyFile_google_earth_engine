@@ -1,0 +1,42 @@
+// Load the CSV file from Earth Engine assets.
+var csvTable = ee.FeatureCollection('projects/xyz-ui7/assets/lat_lon_file');
+
+// Define a DEM dataset (e.g., SRTM).
+var dem = ee.Image('USGS/SRTMGL1_003');
+
+// Function to add elevation data to each point in the feature collection.
+var addElevation = function(feature) {
+  // Get the elevation at the point's location.
+  var elevation = dem.reduceRegion({
+    reducer: ee.Reducer.mean(),
+    geometry: feature.geometry(),
+    scale: 30, // Adjust the scale as needed
+    bestEffort: true
+  });
+  
+  // Return the original feature with added elevation property.
+  return feature.set('elevation', elevation.get('elevation'));
+};
+
+// Map the addElevation function over the feature collection.
+var pointsWithElevation = csvTable.map(addElevation);
+
+// Define a function to extract latitude, longitude, and elevation as properties.
+var extractProperties = function(feature) {
+  var properties = {
+    'latitude': feature.geometry().coordinates().get(1),
+    'longitude': feature.geometry().coordinates().get(0),
+    'elevation': feature.get('elevation')
+  };
+  return ee.Feature(null, properties);
+};
+
+// Map the extractProperties function over the feature collection.
+var exportFeatures = pointsWithElevation.map(extractProperties);
+
+// Export the result as CSV.
+Export.table.toDrive({
+  collection: exportFeatures,
+  description: 'elevation_points_export',
+  fileFormat: 'CSV'
+});
